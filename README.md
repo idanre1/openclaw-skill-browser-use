@@ -45,14 +45,15 @@ agent-browser close
 ### browser-use (Autonomous Agent)
 
 ```bash
-# Set your API key
-export ANTHROPIC_API_KEY="sk-..."
-# or
-export OPENAI_API_KEY="sk-..."
-
-# Run autonomous task
+# Run autonomous task (uses OpenClaw config model defaults)
 browser-use-agent "Go to news.ycombinator.com and find the top 3 AI-related posts"
 ```
+
+The wrapper reads the OpenClaw config to pick the default model and provider:
+- Default path: ~/.openclaw/openclaw.json (or set OPENCLAW_CONFIG)
+- Primary model: agents.defaults.model.primary
+
+Example config: [.assets/openclaw.example.json](.assets/openclaw.example.json)
 
 ## Features
 

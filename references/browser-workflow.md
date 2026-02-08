@@ -108,14 +108,27 @@ agent-browser open "https://site.com/dashboard"
 Pour les cas ou tu veux un agent qui browse de maniere autonome (comme Manus) :
 ```python
 # Script a executer via: /opt/browser-use/bin/python3 script.py
-import asyncio
+import asyncio, json, os
 from browser_use import Agent, Browser
-from langchain_anthropic import ChatAnthropic
-import os
+from langchain_openai import ChatOpenAI
+
+def load_openclaw_config():
+    path = os.environ.get("OPENCLAW_CONFIG") or os.path.expanduser("~/.openclaw/openclaw.json")
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 async def run():
+    config = load_openclaw_config()
+    primary = config["agents"]["defaults"]["model"]["primary"]
+    provider, model_id = primary.split("/", 1)
+    provider_cfg = config["models"]["providers"][provider]
+
     browser = Browser()
-    llm = ChatAnthropic(model='claude-sonnet-4-20250514', api_key=os.environ['ANTHROPIC_API_KEY'])
+    llm = ChatOpenAI(
+        model=model_id,
+        api_key=provider_cfg.get("apiKey"),
+        base_url=provider_cfg.get("baseUrl"),
+    )
     agent = Agent(
         task="Ta tache ici - ex: Trouver les prix de [produit] sur 3 sites et comparer",
         llm=llm,

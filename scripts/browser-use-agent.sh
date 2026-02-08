@@ -8,7 +8,7 @@ VENV_DIR="${BROWSER_USE_VENV:-/opt/browser-use}"
 TASK="${1:?Usage: $0 \"task description\" [--model MODEL] [--max-steps N]}"
 shift
 
-MODEL="gpt-4o-mini"
+MODEL=""
 MAX_STEPS=12
 
 while [[ $# -gt 0 ]]; do
@@ -19,28 +19,69 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [ -z "${OPENAI_API_KEY:-}" ] && [ -f "/root/.openclaw/openclaw.json" ]; then
-    export OPENAI_API_KEY=$(python3 -c "import json; print(json.load(open('/root/.openclaw/openclaw.json'))['models']['providers']['openai']['apiKey'])" 2>/dev/null || true)
-fi
-if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -f "/root/.openclaw/openclaw.json" ]; then
-    export ANTHROPIC_API_KEY=$(python3 -c "import json; print(json.load(open('/root/.openclaw/openclaw.json'))['models']['providers']['anthropic']['apiKey'])" 2>/dev/null || true)
-fi
-
-if [[ "$MODEL" == claude* ]] || [[ "$MODEL" == anthropic* ]]; then
-    LLM_IMPORT="from langchain_anthropic import ChatAnthropic"
-    LLM_INIT="ChatAnthropic(model='$MODEL', api_key=os.environ['ANTHROPIC_API_KEY'])"
-else
-    LLM_IMPORT="from langchain_openai import ChatOpenAI"
-    LLM_INIT="ChatOpenAI(model='$MODEL', api_key=os.environ['OPENAI_API_KEY'])"
-fi
-
 cat > /tmp/_bu_task.py << PYEOF
-import asyncio, os
-$LLM_IMPORT
+import asyncio, json, os
 from browser_use import Agent
 
+def load_openclaw_config():
+    candidates = []
+    env_path = os.environ.get("OPENCLAW_CONFIG")
+    if env_path:
+        candidates.append(env_path)
+    candidates.append(os.path.expanduser("~/.openclaw/openclaw.json"))
+    if os.path.expanduser("~") != "/root":
+        candidates.append("/root/.openclaw/openclaw.json")
+    for path in candidates:
+        if path and os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f), path
+    return {}, None
+
+def resolve_model(config, override):
+    default_primary = (
+        config.get("agents", {})
+        .get("defaults", {})
+        .get("model", {})
+        .get("primary")
+    )
+    model = override or default_primary or "gpt-4o-mini"
+    if "/" in model:
+        provider, model_id = model.split("/", 1)
+    else:
+        if default_primary and "/" in default_primary:
+            provider = default_primary.split("/", 1)[0]
+        else:
+            provider = "openai"
+        model_id = model
+    return provider, model_id, model
+
+def build_llm(config, provider, model_id):
+    providers = config.get("models", {}).get("providers", {})
+    provider_cfg = providers.get(provider, {})
+    api_key = provider_cfg.get("apiKey")
+    base_url = provider_cfg.get("baseUrl")
+    if provider in ("anthropic", "claude"):
+        from langchain_anthropic import ChatAnthropic
+        if not api_key:
+            raise RuntimeError("Missing apiKey for provider 'anthropic' in OpenClaw config.")
+        return ChatAnthropic(model=model_id, api_key=api_key)
+    else:
+        from langchain_openai import ChatOpenAI
+        kwargs = {"model": model_id}
+        if api_key:
+            kwargs["api_key"] = api_key
+        if base_url:
+            kwargs["base_url"] = base_url
+        return ChatOpenAI(**kwargs)
+
 async def run():
-    llm = $LLM_INIT
+    config, config_path = load_openclaw_config()
+    if not config:
+        raise RuntimeError(
+            "OpenClaw config not found. Set OPENCLAW_CONFIG or place openclaw.json under ~/.openclaw/."
+        )
+    provider, model_id, resolved = resolve_model(config, """$MODEL""")
+    llm = build_llm(config, provider, model_id)
     agent = Agent(task="""$TASK""", llm=llm)
     result = await agent.run(max_steps=$MAX_STEPS)
     final = result.final_result()
