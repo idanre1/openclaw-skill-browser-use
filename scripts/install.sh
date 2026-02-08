@@ -4,10 +4,10 @@ set -euo pipefail
 # Browser Use Skill — Installer
 # Installs agent-browser (npm CLI) + browser-use (Python venv) + system deps
 
-VENV_DIR="${BROWSER_USE_VENV:-/opt/browser-use}"
 WRAPPER="/usr/local/bin/browser-use-agent"
 INSTALL_USER="${SUDO_USER:-$USER}"
 INSTALL_HOME="$(getent passwd "$INSTALL_USER" | cut -d: -f6)"
+VENV_DIR="${BROWSER_USE_VENV:-$INSTALL_HOME/opt/browser-use}"
 UV_BIN=""
 
 echo "=== Browser Use Skill Installer ==="
@@ -84,7 +84,7 @@ cat > "$WRAPPER" << 'WRAPPER_EOF'
 # Usage: browser-use-agent "task description" [--model MODEL] [--max-steps N]
 set -euo pipefail
 
-VENV_DIR="${BROWSER_USE_VENV:-/opt/browser-use}"
+VENV_DIR="${BROWSER_USE_VENV:-$HOME/opt/browser-use}"
 TASK="${1:?Usage: browser-use-agent \"task description\" [--model MODEL] [--max-steps N]}"
 shift
 
