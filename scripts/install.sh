@@ -4,7 +4,7 @@ set -euo pipefail
 # Browser Use Skill — Installer
 # Installs agent-browser (npm CLI) + browser-use (Python venv) + system deps
 
-WRAPPER="/usr/local/bin/browser-use-agent"
+WRAPPER="$HOME/.local/bin/browser-use-agent"
 INSTALL_USER="${SUDO_USER:-$USER}"
 INSTALL_HOME="$(getent passwd "$INSTALL_USER" | cut -d: -f6)"
 VENV_DIR="${BROWSER_USE_VENV:-$INSTALL_HOME/opt/browser-use}"
