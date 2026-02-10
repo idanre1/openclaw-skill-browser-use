@@ -39,6 +39,9 @@ fi
 # Install Playwright + Chromium for agent-browser
 echo "[3/5] Installing Playwright browsers..."
 agent-browser install --with-deps 2>/dev/null || agent-browser install 2>/dev/null || {
+    # install playwright
+    npm install -g @playwright/test
+    # install chromium
     npx playwright install chromium 2>/dev/null || true
 }
 
